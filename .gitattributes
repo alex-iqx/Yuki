@@ -1,0 +1,6 @@
+# Universal git attributes to hopefully solve unwanted reverts to commits
+* text=auto
+
+# Force JS files to use LF (universal git line feed)
+# instead of defaulting to Windows' CRLF (carriage return + line feed)
+*.js text eol=lf
