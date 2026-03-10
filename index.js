@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, Events } = require('discord.js');
 const { PREFIX, BOT_TOKEN } = require('./Util/constants');
 const path = require('path');
 
@@ -10,7 +10,7 @@ const client = new Client({
   ]
 });
 
-client.once('ready', () => {
+client.once(Events.ClientReady, () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
