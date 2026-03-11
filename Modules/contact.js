@@ -93,7 +93,7 @@ module.exports = {
                     })
                     .setDescription(content.slice(0, 4096))
                     .setColor(0xFFB4D9)
-                    .setThumbnail(message.author.displayAvatarURL())
+                    .setThumbnail(client.user.displayAvatarURL())
                     .setFooter({ text: `Received at: ${formatDate()}` });
                 await channel.send({ embeds: [embed] }).catch(() => {});
                 await message.react('✅').catch(() => {});
@@ -180,7 +180,7 @@ module.exports = {
                     })
                     .setDescription(content.slice(0, 4096))
                     .setColor(0xFFB4D9)
-                    .setThumbnail(message.author.displayAvatarURL())
+                    .setThumbnail(client.user.displayAvatarURL())
                     .setFooter({ text: `Received at: ${formatDate()}` });
 
                 await ticketChannel.send({ embeds: [ticketEmbed] }).catch(() => {});
@@ -189,7 +189,7 @@ module.exports = {
                     embeds: [createEmbedBase(
                         client,
                         `${guildName} • Contact Staff`,
-                        'Your ticket has been opened. Any further messages you send here will be forwarded to the staff.'
+                        'A ticket has been opened with your request. Any further messages you send here will be forwarded to the staff.'
                     )]
                 }).catch(() => {});
             } catch {
@@ -249,6 +249,7 @@ module.exports = {
 
     async closeTicket(channel, userId, client) {
         const guildName = await getGuildName(client);
+        await new Promise(r => setTimeout(r, 5000));
 
         try {
             const user = await client.users.fetch(userId).catch(() => null);
