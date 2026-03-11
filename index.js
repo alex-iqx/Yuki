@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Events, Partials } = require('discord.js');
+const { Client, GatewayIntentBits, Events, Partials, ActivityType } = require('discord.js');
 const { PREFIX, BOT_TOKEN } = require('./Util/constants');
 const contact = require('./Modules/contact');
 const path = require('path');
@@ -15,6 +15,11 @@ const client = new Client({
 
 client.once(Events.ClientReady, async () => {
   console.log(`Logged in as ${client.user.tag}`);
+
+  client.user.setPresence({
+    activities: [{ name: 'DM me to create a ticket~ 🌸', type: ActivityType.Custom }]
+  });
+
   await contact.init(client);
 });
 

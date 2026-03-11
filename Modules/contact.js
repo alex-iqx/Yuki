@@ -2,7 +2,7 @@ const {
     EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
     ChannelType, PermissionFlagsBits
 } = require('discord.js');
-const { TICKET_CATEGORY_ID, PREFIX } = require('../Util/constants');
+const { TICKET_CATEGORY_ID, PREFIX, TICKET_CLOSED_EMOJI } = require('../Util/constants');
 
 const activeTickets = new Map();
 const ticketUsers = new Map();
@@ -243,7 +243,7 @@ module.exports = {
                 .setFooter({ text: `Received at: ${formatDate()}` });
 
             await user.send({ embeds: [embed] })
-                .then(() => message.react('✅').catch(() => {}))
+                .then(() => message.react(TICKET_CLOSED_EMOJI).catch(() => {}))
                 .catch(() => message.channel.send('Could not send the message to this user (DMs may be disabled).').catch(() => {}));
         } catch {}
     },
