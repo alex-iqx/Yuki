@@ -243,6 +243,7 @@ module.exports = {
                 .setFooter({ text: `Received at: ${formatDate()}` });
 
             await user.send({ embeds: [embed] })
+                .then(() => message.react('✅').catch(() => {}))
                 .catch(() => message.channel.send('Could not send the message to this user (DMs may be disabled).').catch(() => {}));
         } catch {}
     },
