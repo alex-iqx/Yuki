@@ -74,7 +74,7 @@ module.exports = {
                         iconURL: message.author.displayAvatarURL()
                     })
                     .setDescription(content.slice(0, 4096))
-                    .setColor(0xAED6F1)
+                    .setColor(0xFFB4D9)
                     .setTimestamp();
 
                 await channel.send({ embeds: [embed] }).catch(() => {});
@@ -91,7 +91,7 @@ module.exports = {
         const confirmEmbed = new EmbedBuilder()
             .setTitle(`${guildName} • Contact Staff`)
             .setDescription('Are you sure you want to send this message?')
-            .setColor(0xAED6F1)
+            .setColor(0xFFB4D9)
             .setThumbnail(client.user.displayAvatarURL());
 
         const row = new ActionRowBuilder().addComponents(
@@ -129,7 +129,7 @@ module.exports = {
                             embeds: [new EmbedBuilder()
                                 .setTitle(`${guildName} • Contact Staff`)
                                 .setDescription('I cannot create a ticket right now.')
-                                .setColor(0xE74C3C)
+                                .setColor(0xFFB4D9)
                                 .setThumbnail(client.user.displayAvatarURL())]
                         }).catch(() => {});
                         return;
@@ -170,7 +170,7 @@ module.exports = {
                             iconURL: message.author.displayAvatarURL()
                         })
                         .setDescription(content.slice(0, 4096))
-                        .setColor(0xAED6F1)
+                        .setColor(0xFFB4D9)
                         .addFields({
                             name: 'User',
                             value: `${message.author.tag} (${message.author.id})`,
@@ -184,7 +184,7 @@ module.exports = {
                         embeds: [new EmbedBuilder()
                             .setTitle(`${guildName} • Contact Staff`)
                             .setDescription('Your ticket has been opened. Any further messages you send here will be forwarded to the staff.')
-                            .setColor(0x2ECC71)
+                            .setColor(0xFFB4D9)
                             .setThumbnail(client.user.displayAvatarURL())]
                     }).catch(() => {});
                 } catch {
@@ -192,7 +192,7 @@ module.exports = {
                         embeds: [new EmbedBuilder()
                             .setTitle(`${guildName} • Contact Staff`)
                             .setDescription('An error occurred while creating your ticket.')
-                            .setColor(0xE74C3C)
+                            .setColor(0xFFB4D9)
                             .setThumbnail(client.user.displayAvatarURL())]
                     }).catch(() => {});
                 }
@@ -201,7 +201,7 @@ module.exports = {
                     embeds: [new EmbedBuilder()
                         .setTitle(`${guildName} • Contact Staff`)
                         .setDescription('Contact request has been cancelled.')
-                        .setColor(0x95A5A6)
+                        .setColor(0xFFB4D9)
                         .setThumbnail(client.user.displayAvatarURL())]
                 }).catch(() => {});
             }
@@ -214,7 +214,7 @@ module.exports = {
                     embeds: [new EmbedBuilder()
                         .setTitle(`${guildName} • Contact Staff`)
                         .setDescription('The confirmation time has expired.')
-                        .setColor(0x95A5A6)
+                        .setColor(0xFFB4D9)
                         .setThumbnail(client.user.displayAvatarURL())]
                 }).catch(() => {});
             }
@@ -241,7 +241,7 @@ module.exports = {
                     iconURL: message.author.displayAvatarURL()
                 })
                 .setDescription(content.slice(0, 4096))
-                .setColor(0xAED6F1)
+                .setColor(0xFFB4D9)
                 .setTimestamp();
 
             await user.send({ embeds: [embed] }).catch(() => {
