@@ -2,22 +2,35 @@ const {
     EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
     ChannelType, PermissionFlagsBits
 } = require('discord.js');
-const { TICKET_CATEGORY_ID } = require('../Util/constants');
+const { TICKET_CATEGORY_ID, PREFIX } = require('../Util/constants');
 
 const activeTickets = new Map();
 const ticketUsers = new Map();
-
 let cachedGuildName = null;
+
+const formatDate = () =>
+    new Date().toLocaleString('en-GB', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+    }).replace(',', '');
 
 async function getGuildName(client) {
     if (cachedGuildName) return cachedGuildName;
     try {
         const category = await client.channels.fetch(TICKET_CATEGORY_ID);
-        cachedGuildName = category.guild.name;
+        cachedGuildName = category?.guild?.name || 'Server';
     } catch {
         cachedGuildName = 'Server';
     }
     return cachedGuildName;
+}
+
+function createEmbedBase(client, title, description) {
+    return new EmbedBuilder()
+        .setTitle(title)
+        .setDescription(description)
+        .setColor(0xFFB4D9)
+        .setThumbnail(client.user.displayAvatarURL());
 }
 
 module.exports = {
@@ -27,30 +40,32 @@ module.exports = {
         if (!TICKET_CATEGORY_ID) return;
         try {
             const category = await client.channels.fetch(TICKET_CATEGORY_ID);
-            if (!category || category.type !== ChannelType.GuildCategory) return;
-
+            if (category?.type !== ChannelType.GuildCategory) return;
             const guild = category.guild;
             const channels = await guild.channels.fetch();
 
-            for (const [channelId, channel] of channels) {
+            for (const [, channel] of channels) {
                 if (channel.parentId === TICKET_CATEGORY_ID && channel.name.startsWith('ticket-')) {
-                    const userId = channel.topic;
-                    if (userId) {
-                        activeTickets.set(userId, channelId);
-                        ticketUsers.set(channelId, userId);
-                    }
+                    try {
+                        const messages = await channel.messages.fetch({ limit: 1, after: '0' });
+                        const firstMsg = messages.first();
+                        const authorName = firstMsg?.embeds?.[0]?.author?.name;
+                        const match = authorName?.match(/\((\d+)\)$/);
+                        if (match) {
+                            const userId = match[1];
+                            activeTickets.set(userId, channel.id);
+                            ticketUsers.set(channel.id, userId);
+                        }
+                    } catch {}
                 }
             }
-
             console.log(`Loaded ${activeTickets.size} active ticket(s).`);
         } catch (err) {
             console.error('Failed to load active tickets:', err);
         }
     },
 
-    isTicketChannel(channelId) {
-        return ticketUsers.has(channelId);
-    },
+    isTicketChannel: channelId => ticketUsers.has(channelId),
 
     onChannelDelete(channelId) {
         const userId = ticketUsers.get(channelId);
@@ -61,8 +76,11 @@ module.exports = {
     },
 
     async handleDM(message, client) {
+        if (!TICKET_CATEGORY_ID) return;
         const content = (message.content || '').trim();
-        if (!TICKET_CATEGORY_ID || !content) return;
+        if (!content) return;
+
+        const guildName = await getGuildName(client);
 
         const existingChannelId = activeTickets.get(message.author.id);
         if (existingChannelId) {
@@ -70,30 +88,22 @@ module.exports = {
             if (channel) {
                 const embed = new EmbedBuilder()
                     .setAuthor({
-                        name: message.author.tag,
+                        name: `${message.author.tag} (${message.author.id})`,
                         iconURL: message.author.displayAvatarURL()
                     })
                     .setDescription(content.slice(0, 4096))
                     .setColor(0xFFB4D9)
-                    .setTimestamp();
-
+                    .setThumbnail(message.author.displayAvatarURL())
+                    .setFooter({ text: `Received at: ${formatDate()}` });
                 await channel.send({ embeds: [embed] }).catch(() => {});
                 await message.react('✅').catch(() => {});
                 return;
             }
-
             activeTickets.delete(message.author.id);
             ticketUsers.delete(existingChannelId);
         }
 
-        const guildName = await getGuildName(client);
-
-        const confirmEmbed = new EmbedBuilder()
-            .setTitle(`${guildName} • Contact Staff`)
-            .setDescription('Are you sure you want to send this message?')
-            .setColor(0xFFB4D9)
-            .setThumbnail(client.user.displayAvatarURL());
-
+        const confirmEmbed = createEmbedBase(client, `${guildName} • Contact Staff`, 'Are you sure you want to send this message?');
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('contact_confirm')
@@ -105,104 +115,90 @@ module.exports = {
                 .setStyle(ButtonStyle.Secondary)
         );
 
-        const prompt = await message.channel.send({
-            embeds: [confirmEmbed],
-            components: [row]
-        }).catch(() => null);
-
+        const prompt = await message.channel.send({ embeds: [confirmEmbed], components: [row] }).catch(() => null);
         if (!prompt) return;
 
         const collector = prompt.createMessageComponentCollector({
-            filter: (i) => i.user.id === message.author.id,
-            time: 120_000,
-            max: 1
+            filter: i => i.user.id === message.author.id,
+            time: 120_000, max: 1
         });
 
-        collector.on('collect', async (interaction) => {
+        collector.on('collect', async interaction => {
             await interaction.update({ components: [] }).catch(() => {});
 
-            if (interaction.customId === 'contact_confirm') {
-                try {
-                    const category = await client.channels.fetch(TICKET_CATEGORY_ID).catch(() => null);
-                    if (!category || category.type !== ChannelType.GuildCategory) {
-                        await message.channel.send({
-                            embeds: [new EmbedBuilder()
-                                .setTitle(`${guildName} • Contact Staff`)
-                                .setDescription('I cannot create a ticket right now.')
-                                .setColor(0xFFB4D9)
-                                .setThumbnail(client.user.displayAvatarURL())]
-                        }).catch(() => {});
-                        return;
-                    }
-
-                    const guild = category.guild;
-                    const username = message.author.username
-                        .toLowerCase()
-                        .replace(/[^a-z0-9-]/g, '')
-                        .slice(0, 80) || 'user';
-
-                    const ticketChannel = await guild.channels.create({
-                        name: `ticket-${username}`,
-                        type: ChannelType.GuildText,
-                        parent: TICKET_CATEGORY_ID,
-                        topic: message.author.id,
-                        permissionOverwrites: [
-                            {
-                                id: guild.id,
-                                deny: [PermissionFlagsBits.ViewChannel]
-                            },
-                            {
-                                id: client.user.id,
-                                allow: [
-                                    PermissionFlagsBits.ViewChannel,
-                                    PermissionFlagsBits.SendMessages
-                                ]
-                            }
-                        ]
-                    });
-
-                    activeTickets.set(message.author.id, ticketChannel.id);
-                    ticketUsers.set(ticketChannel.id, message.author.id);
-
-                    const ticketEmbed = new EmbedBuilder()
-                        .setAuthor({
-                            name: message.author.tag,
-                            iconURL: message.author.displayAvatarURL()
-                        })
-                        .setDescription(content.slice(0, 4096))
-                        .setColor(0xFFB4D9)
-                        .addFields({
-                            name: 'User',
-                            value: `${message.author.tag} (${message.author.id})`,
-                            inline: true
-                        })
-                        .setTimestamp();
-
-                    await ticketChannel.send({ embeds: [ticketEmbed] }).catch(() => {});
-
-                    await message.channel.send({
-                        embeds: [new EmbedBuilder()
-                            .setTitle(`${guildName} • Contact Staff`)
-                            .setDescription('Your ticket has been opened. Any further messages you send here will be forwarded to the staff.')
-                            .setColor(0xFFB4D9)
-                            .setThumbnail(client.user.displayAvatarURL())]
-                    }).catch(() => {});
-                } catch {
-                    await message.channel.send({
-                        embeds: [new EmbedBuilder()
-                            .setTitle(`${guildName} • Contact Staff`)
-                            .setDescription('An error occurred while creating your ticket.')
-                            .setColor(0xFFB4D9)
-                            .setThumbnail(client.user.displayAvatarURL())]
-                    }).catch(() => {});
-                }
-            } else {
+            if (interaction.customId !== 'contact_confirm') {
                 await message.channel.send({
-                    embeds: [new EmbedBuilder()
-                        .setTitle(`${guildName} • Contact Staff`)
-                        .setDescription('Contact request has been cancelled.')
-                        .setColor(0xFFB4D9)
-                        .setThumbnail(client.user.displayAvatarURL())]
+                    embeds: [createEmbedBase(
+                        client,
+                        `${guildName} • Contact Staff`,
+                        'Contact request has been cancelled.'
+                    )]
+                }).catch(() => {});
+                return;
+            }
+
+            try {
+                const category = await client.channels.fetch(TICKET_CATEGORY_ID).catch(() => null);
+                if (!category || category.type !== ChannelType.GuildCategory) {
+                    await message.channel.send({
+                        embeds: [createEmbedBase(
+                            client,
+                            `${guildName} • Contact Staff`,
+                            'I cannot create a ticket right now.'
+                        )]
+                    }).catch(() => {});
+                    return;
+                }
+
+                const guild = category.guild;
+                const username = (message.author.username.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 80)) || 'user';
+
+                const ticketChannel = await guild.channels.create({
+                    name: `ticket-${username}`,
+                    type: ChannelType.GuildText,
+                    parent: TICKET_CATEGORY_ID,
+                    permissionOverwrites: [
+                        { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+                        { id: client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
+                    ]
+                }).catch(() => null);
+
+                if (!ticketChannel) {
+                    await message.channel.send({
+                        embeds: [createEmbedBase(client, `${guildName} • Contact Staff`, 'Failed to create ticket channel.')]
+                    }).catch(() => {});
+                    return;
+                }
+
+                activeTickets.set(message.author.id, ticketChannel.id);
+                ticketUsers.set(ticketChannel.id, message.author.id);
+
+                const ticketEmbed = new EmbedBuilder()
+                    .setAuthor({
+                        name: `${message.author.tag} (${message.author.id})`,
+                        iconURL: message.author.displayAvatarURL()
+                    })
+                    .setDescription(content.slice(0, 4096))
+                    .setColor(0xFFB4D9)
+                    .setThumbnail(message.author.displayAvatarURL())
+                    .setFooter({ text: `Received at: ${formatDate()}` });
+
+                await ticketChannel.send({ embeds: [ticketEmbed] }).catch(() => {});
+
+                await message.channel.send({
+                    embeds: [createEmbedBase(
+                        client,
+                        `${guildName} • Contact Staff`,
+                        'Your ticket has been opened. Any further messages you send here will be forwarded to the staff.'
+                    )]
+                }).catch(() => {});
+            } catch {
+                await message.channel.send({
+                    embeds: [createEmbedBase(
+                        client,
+                        `${guildName} • Contact Staff`,
+                        'An error occurred while creating your ticket.'
+                    )]
                 }).catch(() => {});
             }
         });
@@ -211,11 +207,11 @@ module.exports = {
             if (collected.size === 0) {
                 await prompt.edit({ components: [] }).catch(() => {});
                 await message.channel.send({
-                    embeds: [new EmbedBuilder()
-                        .setTitle(`${guildName} • Contact Staff`)
-                        .setDescription('The confirmation time has expired.')
-                        .setColor(0xFFB4D9)
-                        .setThumbnail(client.user.displayAvatarURL())]
+                    embeds: [createEmbedBase(
+                        client,
+                        `${guildName} • Contact Staff`,
+                        'The confirmation time has expired.'
+                    )]
                 }).catch(() => {});
             }
         });
@@ -227,13 +223,14 @@ module.exports = {
 
         const content = (message.content || '').trim();
         if (!content) return;
+        if (content.toLowerCase() === `${PREFIX}close`)
+            return this.closeTicket(message.channel, userId, client);
 
         try {
             const user = await client.users.fetch(userId).catch(() => null);
             if (!user) return;
 
             const guildName = await getGuildName(client);
-
             const embed = new EmbedBuilder()
                 .setTitle(`${guildName} • Contact Staff`)
                 .setAuthor({
@@ -242,13 +239,32 @@ module.exports = {
                 })
                 .setDescription(content.slice(0, 4096))
                 .setColor(0xFFB4D9)
-                .setTimestamp();
+                .setThumbnail(client.user.displayAvatarURL())
+                .setFooter({ text: `Received at: ${formatDate()}` });
 
-            await user.send({ embeds: [embed] }).catch(() => {
-                message.channel.send('Could not send the message to this user (DMs may be disabled).').catch(() => {});
-            });
-        } catch {
-            // silently fail
-        }
+            await user.send({ embeds: [embed] })
+                .catch(() => message.channel.send('Could not send the message to this user (DMs may be disabled).').catch(() => {}));
+        } catch {}
+    },
+
+    async closeTicket(channel, userId, client) {
+        const guildName = await getGuildName(client);
+
+        try {
+            const user = await client.users.fetch(userId).catch(() => null);
+            if (user) {
+                await user.send({
+                    embeds: [createEmbedBase(
+                        client,
+                        `${guildName} • Contact Staff`,
+                        'Your ticket has been closed. If you need further assistance, feel free to send a new message.'
+                    )]
+                }).catch(() => {});
+            }
+        } catch {}
+
+        activeTickets.delete(userId);
+        ticketUsers.delete(channel.id);
+        await channel.delete().catch(() => {});
     }
 };
