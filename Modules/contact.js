@@ -96,7 +96,7 @@ module.exports = {
                     .setThumbnail(client.user.displayAvatarURL())
                     .setFooter({ text: `Received at: ${formatDate()}` });
                 await channel.send({ embeds: [embed] }).catch(() => {});
-                await message.react('✅').catch(() => {});
+                await message.react(TICKET_CLOSED_EMOJI).catch(() => {});
                 return;
             }
             activeTickets.delete(message.author.id);
