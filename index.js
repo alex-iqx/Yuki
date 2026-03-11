@@ -1,21 +1,33 @@
-const { Client, GatewayIntentBits, Events } = require('discord.js');
+const { Client, GatewayIntentBits, Events, Partials } = require('discord.js');
 const { PREFIX, BOT_TOKEN } = require('./Util/constants');
+const contact = require('./Modules/contact');
 const path = require('path');
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages
+  ],
+  partials: [Partials.Channel]
 });
 
-client.once(Events.ClientReady, () => {
+client.once(Events.ClientReady, async () => {
   console.log(`Logged in as ${client.user.tag}`);
+  await contact.init(client);
 });
 
 client.on('messageCreate', (message) => {
   if (message.author.bot) return;
+
+  if (!message.guild) {
+    return contact.handleDM(message, client).catch(() => {});
+  }
+
+  if (contact.isTicketChannel(message.channel.id)) {
+    return contact.handleTicketMessage(message, client).catch(() => {});
+  }
 
   if (!message.content.startsWith(PREFIX)) return;
 
@@ -36,6 +48,10 @@ client.on('messageCreate', (message) => {
     }
     throw err;
   }
+});
+
+client.on(Events.ChannelDelete, (channel) => {
+  contact.onChannelDelete(channel.id);
 });
 
 client.login(BOT_TOKEN);
