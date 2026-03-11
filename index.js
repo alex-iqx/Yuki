@@ -17,7 +17,7 @@ client.once(Events.ClientReady, async () => {
   console.log(`Logged in as ${client.user.tag}`);
 
   client.user.setPresence({
-    activities: [{ name: 'DM me to create a ticket~ 🌸', type: ActivityType.Custom }]
+    activities: [{ name: 'DM me to contact our staff~ 🌸', type: ActivityType.Custom }]
   });
 
   await contact.init(client);
