@@ -113,7 +113,7 @@ module.exports = {
         const confirmEmbed = createEmbed(
             guild,
             `Are you sure you want to contact the ${guild.name} staff team?`,
-            'If you wish to continue, click the ✅ button below to open a support ticket.'
+            'If you wish to continue, click the \"Send\" button below to open a support ticket.'
         );
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
