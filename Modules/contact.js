@@ -153,15 +153,15 @@ module.exports = {
                     return;
                 }
 
-                const guild = category.guild;
+                const discordGuild = category.guild;
                 const username = (message.author.username.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 80)) || 'user';
 
-                const ticketChannel = await guild.channels.create({
+                const ticketChannel = await discordGuild.channels.create({
                     name: `ticket-${username}`,
                     type: ChannelType.GuildText,
                     parent: TICKET_CATEGORY_ID,
                     permissionOverwrites: [
-                        { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+                        { id: discordGuild.id, deny: [PermissionFlagsBits.ViewChannel] },
                         { id: client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
                     ]
                 }).catch(() => null);
@@ -199,7 +199,8 @@ module.exports = {
                             iconURL: guild.iconURL
                         })]
                 }).catch(() => {});
-            } catch {
+            } catch (err) {
+                console.error('Failed while creating ticket:', err);
                 await message.channel.send({
                     embeds: [createEmbed(guild, 'Something Went Wrong', 'An error occurred while creating your ticket. Please try again later.')]
                 }).catch(() => {});
