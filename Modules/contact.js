@@ -249,7 +249,24 @@ module.exports = {
 
     async closeTicket(channel, userId, client) {
         const guild = await getGuild(client);
-        await new Promise(r => setTimeout(r, 5000));
+
+        const countdownEmbed = new EmbedBuilder()
+            .setTitle('Ticket Closing')
+            .setDescription('This ticket will be closed in **5** seconds.')
+            .setColor(0xFFB4D9)
+            .setThumbnail(guild.iconURL)
+            .setFooter({ text: formatDate() });
+
+        const countdownMsg = await channel.send({ embeds: [countdownEmbed] }).catch(() => null);
+
+        for (let left = 4; left >= 1 && countdownMsg; left--) {
+            await new Promise(r => setTimeout(r, 1000));
+            countdownEmbed.setDescription(`This ticket will be closed in **${left}** second${left === 1 ? '' : 's'}.`);
+            await countdownMsg.edit({ embeds: [countdownEmbed] }).catch(() => {});
+        }
+        if (countdownMsg) {
+            await new Promise(r => setTimeout(r, 1000));
+        }
 
         try {
             const user = await client.users.fetch(userId).catch(() => null);
