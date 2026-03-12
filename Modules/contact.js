@@ -6,7 +6,7 @@ const { TICKET_CATEGORY_ID, PREFIX, TICKET_CLOSED_EMOJI } = require('../Util/con
 
 const activeTickets = new Map();
 const ticketUsers = new Map();
-let cachedGuildName = null;
+let cachedGuild = null;
 
 const formatDate = () =>
     new Date().toLocaleString('en-GB', {
@@ -14,23 +14,30 @@ const formatDate = () =>
         hour: '2-digit', minute: '2-digit'
     }).replace(',', '');
 
-async function getGuildName(client) {
-    if (cachedGuildName) return cachedGuildName;
+async function getGuild(client) {
+    if (cachedGuild) return cachedGuild;
     try {
         const category = await client.channels.fetch(TICKET_CATEGORY_ID);
-        cachedGuildName = category?.guild?.name || 'Server';
+        const guild = category?.guild;
+        cachedGuild = {
+            name: guild?.name || 'Server',
+            iconURL: guild?.iconURL() || client.user.displayAvatarURL()
+        };
     } catch {
-        cachedGuildName = 'Server';
+        cachedGuild = {
+            name: 'Server',
+            iconURL: client.user.displayAvatarURL()
+        };
     }
-    return cachedGuildName;
+    return cachedGuild;
 }
 
-function createEmbedBase(client, title, description) {
+function createEmbed(guild, title, description) {
     return new EmbedBuilder()
         .setTitle(title)
         .setDescription(description)
         .setColor(0xFFB4D9)
-        .setThumbnail(client.user.displayAvatarURL());
+        .setThumbnail(guild.iconURL);
 }
 
 module.exports = {
@@ -80,7 +87,7 @@ module.exports = {
         const content = (message.content || '').trim();
         if (!content) return;
 
-        const guildName = await getGuildName(client);
+        const guild = await getGuild(client);
 
         const existingChannelId = activeTickets.get(message.author.id);
         if (existingChannelId) {
@@ -93,7 +100,7 @@ module.exports = {
                     })
                     .setDescription(content.slice(0, 4096))
                     .setColor(0xFFB4D9)
-                    .setThumbnail(client.user.displayAvatarURL())
+                    .setThumbnail(guild.iconURL)
                     .setFooter({ text: `Received at: ${formatDate()}` });
                 await channel.send({ embeds: [embed] }).catch(() => {});
                 await message.react(TICKET_CLOSED_EMOJI).catch(() => {});
@@ -103,7 +110,14 @@ module.exports = {
             ticketUsers.delete(existingChannelId);
         }
 
-        const confirmEmbed = createEmbedBase(client, `${guildName} • Contact Staff`, 'Are you sure you want to send this message?');
+        const confirmEmbed = createEmbed(
+            guild,
+            `Contact 🌸 ${guild.name} Staff`,
+            [
+                `Are you sure you want to contact the ${guild.name} staff team?`,
+                'If you wish to continue, click the "Send" button below to open a support ticket.'
+            ].join('\n')
+        );
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('contact_confirm')
@@ -128,11 +142,7 @@ module.exports = {
 
             if (interaction.customId !== 'contact_confirm') {
                 await message.channel.send({
-                    embeds: [createEmbedBase(
-                        client,
-                        `${guildName} • Contact Staff`,
-                        'Contact request has been cancelled.'
-                    )]
+                    embeds: [createEmbed(guild, 'Request Cancelled', 'Your contact request has been cancelled. No ticket was created.')]
                 }).catch(() => {});
                 return;
             }
@@ -141,11 +151,7 @@ module.exports = {
                 const category = await client.channels.fetch(TICKET_CATEGORY_ID).catch(() => null);
                 if (!category || category.type !== ChannelType.GuildCategory) {
                     await message.channel.send({
-                        embeds: [createEmbedBase(
-                            client,
-                            `${guildName} • Contact Staff`,
-                            'I cannot create a ticket right now.'
-                        )]
+                        embeds: [createEmbed(guild, 'Unavailable', 'We cannot create a ticket right now. Please try again later.')]
                     }).catch(() => {});
                     return;
                 }
@@ -165,7 +171,7 @@ module.exports = {
 
                 if (!ticketChannel) {
                     await message.channel.send({
-                        embeds: [createEmbedBase(client, `${guildName} • Contact Staff`, 'Failed to create ticket channel.')]
+                        embeds: [createEmbed(guild, 'Ticket Creation Failed', 'Something went wrong while creating your ticket. Please try again later.')]
                     }).catch(() => {});
                     return;
                 }
@@ -180,25 +186,25 @@ module.exports = {
                     })
                     .setDescription(content.slice(0, 4096))
                     .setColor(0xFFB4D9)
-                    .setThumbnail(client.user.displayAvatarURL())
+                    .setThumbnail(guild.iconURL)
                     .setFooter({ text: `Received at: ${formatDate()}` });
 
                 await ticketChannel.send({ embeds: [ticketEmbed] }).catch(() => {});
 
                 await message.channel.send({
-                    embeds: [createEmbedBase(
-                        client,
-                        `${guildName} • Contact Staff`,
-                        'A ticket has been opened with your request. Any further messages you send here will be forwarded to the staff.'
-                    )]
+                    embeds: [new EmbedBuilder()
+                        .setTitle('Staff Contacted')
+                        .setDescription('We have opened a ticket with your message. Our staff team will review it and respond here as soon as they can.')
+                        .setColor(0xFFB4D9)
+                        .setThumbnail(guild.iconURL)
+                        .setFooter({
+                            text: `Message forwarded • ${formatDate()}`,
+                            iconURL: guild.iconURL
+                        })]
                 }).catch(() => {});
             } catch {
                 await message.channel.send({
-                    embeds: [createEmbedBase(
-                        client,
-                        `${guildName} • Contact Staff`,
-                        'An error occurred while creating your ticket.'
-                    )]
+                    embeds: [createEmbed(guild, 'Something Went Wrong', 'An error occurred while creating your ticket. Please try again later.')]
                 }).catch(() => {});
             }
         });
@@ -207,11 +213,7 @@ module.exports = {
             if (collected.size === 0) {
                 await prompt.edit({ components: [] }).catch(() => {});
                 await message.channel.send({
-                    embeds: [createEmbedBase(
-                        client,
-                        `${guildName} • Contact Staff`,
-                        'The confirmation time has expired.'
-                    )]
+                    embeds: [createEmbed(guild, 'Request Expired', 'You took too long to respond. Please send your message again to retry.')]
                 }).catch(() => {});
             }
         });
@@ -230,17 +232,19 @@ module.exports = {
             const user = await client.users.fetch(userId).catch(() => null);
             if (!user) return;
 
-            const guildName = await getGuildName(client);
+            const guild = await getGuild(client);
             const embed = new EmbedBuilder()
-                .setTitle(`${guildName} • Contact Staff`)
                 .setAuthor({
                     name: message.author.tag,
                     iconURL: message.author.displayAvatarURL()
                 })
                 .setDescription(content.slice(0, 4096))
                 .setColor(0xFFB4D9)
-                .setThumbnail(client.user.displayAvatarURL())
-                .setFooter({ text: `Received at: ${formatDate()}` });
+                .setThumbnail(guild.iconURL)
+                .setFooter({
+                    text: `Staff 🌸 ${guild.name} • ${formatDate()}`,
+                    iconURL: guild.iconURL
+                });
 
             await user.send({ embeds: [embed] })
                 .then(() => message.react(TICKET_CLOSED_EMOJI).catch(() => {}))
@@ -249,18 +253,14 @@ module.exports = {
     },
 
     async closeTicket(channel, userId, client) {
-        const guildName = await getGuildName(client);
+        const guild = await getGuild(client);
         await new Promise(r => setTimeout(r, 5000));
 
         try {
             const user = await client.users.fetch(userId).catch(() => null);
             if (user) {
                 await user.send({
-                    embeds: [createEmbedBase(
-                        client,
-                        `${guildName} • Contact Staff`,
-                        'Your ticket has been closed. If you need further assistance, feel free to send a new message.'
-                    )]
+                    embeds: [createEmbed(guild, 'Ticket Closed', 'Your ticket has been closed. If you need further assistance, feel free to send a new message.')]
                 }).catch(() => {});
             }
         } catch {}
