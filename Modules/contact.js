@@ -37,8 +37,7 @@ function createEmbed(guild, title, description) {
         .setTitle(title)
         .setDescription(description)
         .setColor(0xFFB4D9)
-        .setThumbnail(guild.iconURL)
-        .setFooter({ text: formatDate() });
+        .setThumbnail(guild.iconURL);
 }
 
 module.exports = {
@@ -195,7 +194,10 @@ module.exports = {
                         .setDescription('We have opened a ticket with your message. Our staff team will review it and respond here as soon as they can.')
                         .setColor(0xFFB4D9)
                         .setThumbnail(guild.iconURL)
-                        .setFooter({ text: `Message forwarded • ${formatDate()}` })]
+                        .setFooter({
+                            text: `Message forwarded • ${formatDate()}`,
+                            iconURL: guild.iconURL
+                        })]
                 }).catch(() => {});
             } catch (err) {
                 console.error('Failed while creating ticket:', err);
