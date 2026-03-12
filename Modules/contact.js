@@ -239,10 +239,7 @@ module.exports = {
                 .setDescription(content.slice(0, 4096))
                 .setColor(0xFFB4D9)
                 .setThumbnail(guild.iconURL)
-                .setFooter({
-                    text: `Staff 🌸 ${guild.name} • ${formatDate()}`,
-                    iconURL: guild.iconURL
-                });
+                .setFooter({ text: `Staff 🌸 ${guild.name} • ${formatDate()}` });
 
             await user.send({ embeds: [embed] })
                 .then(() => message.react(TICKET_CLOSED_EMOJI).catch(() => {}))
